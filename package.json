@@ -1,6 +1,6 @@
 {
   "name": "discord-gradio",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A stateless engine to bridge any Gradio App (HF Spaces, Shared Links) to Discord Modals with zero-config.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
