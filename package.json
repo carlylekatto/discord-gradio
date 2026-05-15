@@ -1,0 +1,44 @@
+{
+  "name": "discord-gradio",
+  "version": "1.0.0",
+  "description": "Seamlessly integrate any Gradio App into Discord with auto-detection and i18n support.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup src/index.ts --watch --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --minify --target node16",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "discord",
+    "gradio",
+    "ai",
+    "bot",
+    "integration",
+    "huggingface"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@gradio/client": "^2.2.0",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.5"
+  }
+}

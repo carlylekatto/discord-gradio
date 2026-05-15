@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Development/Debug
+scratch/
+examples/*.log
+.env
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo
+
+package-lock.json
