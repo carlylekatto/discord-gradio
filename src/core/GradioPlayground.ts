@@ -1,7 +1,4 @@
 import { 
-    Client as GradioClient 
-} from '@gradio/client';
-import { 
     InteractionType, 
     ModalSubmitInteraction, 
     ButtonInteraction,
@@ -31,11 +28,26 @@ export class GradioPlayground {
     }
 
     /**
+     * Get the standard customId for the bridge button that opens the first modal page.
+     * Use this if you want to build your own custom bridge message.
+     */
+    getOpenModalId(interaction: any, pageIndex: number = 0): string {
+        return `dg_open_modal_${interaction.id}_${pageIndex}`;
+    }
+
+    /**
      * Handles the /gradio run command flow
+     * @param {Object} interaction - The Discord CommandInteraction
+     * @param {string} appReference - App reference (Space ID, URL, or shared link)
+     * @param {string} [targetApiName] - Optional API endpoint name. If missing, auto-detects main endpoint.
+     * @param {Object} [options={}] - Additional options
+     * @param {boolean} [options.ephemeral=true] - Whether initial replies should be ephemeral
+     * @param {string} [options.language='en'] - The language code for i18n translations
+     * @param {boolean} [options.manualBridge=false] - If true and interaction is deferred, library won't auto-send the bridge button.
      */
     async init(interaction: any, appReference: string, targetApiName: string | null = null, options: any = {}) {
         const sessionId = interaction.id;
-        const isEphemeral = options.ephemeral !== false;
+        const isEphemeral = options.ephemeral !== false; 
         const language = options.language || 'en';
 
         try {
@@ -45,24 +57,10 @@ export class GradioPlayground {
             
             // 2. Parse Config
             const parsed = ConfigParser.parse(config, targetApiName, language);
-            const { inputs, outputs, fnIndex } = parsed;
+            const { inputs, outputs } = parsed;
 
             // Detect API standard
-            let appApiUrl = baseUrl;
-            if (config.api_prefix) {
-                let prefix = config.api_prefix;
-                if (!prefix.startsWith('/')) prefix = '/' + prefix;
-                appApiUrl = `${baseUrl}${prefix}`;
-            } else {
-                try {
-                    const apiCheck = await fetch(`${baseUrl}/gradio_api/info`);
-                    if (apiCheck.ok) {
-                        appApiUrl = `${baseUrl}/gradio_api`;
-                    }
-                } catch (e) {
-                    appApiUrl = baseUrl;
-                }
-            }
+            const appApiUrl = await this.detectAppApiUrl(baseUrl, config);
 
             // 3. Initialize Session
             this.sessions.set(sessionId, {
@@ -71,6 +69,7 @@ export class GradioPlayground {
                 targetApiName: parsed.apiName,
                 fnIndex: parsed.fnIndex,
                 appApiUrl,
+                baseUrl,
                 inputs,
                 outputs,
                 translations: parsed.translations || {},
@@ -79,8 +78,43 @@ export class GradioPlayground {
                 options
             });
 
-            // 4. Show First Modal
-            await this.showModal(interaction, sessionId, 0);
+            // 4. Handle Modal Display
+            if (interaction.deferred || interaction.replied) {
+                // If developer wants to handle the bridge message manually, we stop here.
+                if (options.manualBridge === true) {
+                    Logger.info(`[${sessionId}] Manual bridge mode enabled. Session initialized.`);
+                    return;
+                }
+
+                // If already deferred/replied, we show a default "Bridge Button"
+                const bridgeButtonId = this.getOpenModalId(interaction, 0);
+                const replyOptions: any = {
+                    content: `✨ **${parsed.apiName || 'Gradio App'}** is ready!`,
+                    components: [
+                        {
+                            type: 1,
+                            components: [
+                                {
+                                    type: 2,
+                                    style: 1, // Primary
+                                    label: 'Open Form',
+                                    emoji: { name: '⌨️' },
+                                    custom_id: bridgeButtonId
+                                }
+                            ]
+                        }
+                    ]
+                };
+
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.editReply(replyOptions);
+                } else {
+                    await interaction.reply({ ...replyOptions, flags: isEphemeral ? 64 : undefined });
+                }
+            } else {
+                // Try to show modal directly
+                await this.showModal(interaction, sessionId, 0);
+            }
 
         } catch (error: any) {
             Logger.error('Error in playground.init:', error);
@@ -126,8 +160,79 @@ export class GradioPlayground {
         // Extract values
         const submittedValues: any[] = [];
         for (let i = 0; i < session.inputs.length; i++) {
-            const fieldId = IdManager.encodeFieldId(sessionId, i, session.inputs[i].type);
-            const value = interaction.fields.getTextInputValue(fieldId);
+            const input = session.inputs[i];
+            const type = input.type;
+            const index = input.index; // Use the actual Gradio component index
+            const fieldId = IdManager.encodeFieldId(sessionId, index, type);
+            
+            let value: any;
+            try {
+                // Try standard text input first
+                value = interaction.fields.getTextInputValue(fieldId);
+            } catch (e) {
+                // Try to find components in various possible locations
+                const rawData = (interaction as any).components || (interaction as any).data?.components;
+                
+                if (rawData) {
+                    for (const rootComp of rawData) {
+                        const getCustomId = (c: any) => c?.customId || c?.custom_id;
+                        
+                        const extractValue = (c: any) => {
+                            const attachments = c.attachments || [];
+                            const getUrl = (a: any) => a.attachment || a.proxy_url || a.proxyURL || a.url;
+                            
+                            let val = c.value || c.values || c.attachment_id;
+                            
+                            // If it's a Type 19 (FileUpload) or has attachments, resolve to URLs
+                            if (c.type === 19 || attachments.length > 0) {
+                                // 1. Try to find URL in local attachments first
+                                const urls = attachments.map((a: any) => getUrl(a)).filter((u: any) => !!u);
+                                
+                                // 2. If no local attachments, try to resolve IDs using interaction.data.resolved
+                                if (urls.length === 0) {
+                                    const ids = Array.isArray(val) ? val : (val ? [val] : []);
+                                    for (const id of ids) {
+                                        const resolved = (interaction as any).data?.resolved?.attachments?.[id] || 
+                                                       (interaction as any).attachments?.get(id);
+                                        if (resolved) {
+                                            const u = getUrl(resolved);
+                                            if (u) urls.push(u);
+                                        }
+                                    }
+                                }
+                                
+                                if (urls.length > 0) {
+                                    // For single-file components, return the first URL
+                                    if (['image', 'file', 'audio', 'video'].includes(input.type)) return urls[0];
+                                    return urls;
+                                }
+                            }
+                            return val;
+                        };
+
+                        if (getCustomId(rootComp) === fieldId) {
+                            value = extractValue(rootComp);
+                            break;
+                        }
+
+                        if (rootComp.type === 1 && rootComp.components) {
+                            const found = rootComp.components.find((c: any) => getCustomId(c) === fieldId);
+                            if (found) {
+                                value = extractValue(found);
+                                break;
+                            }
+                        }
+
+                        if (rootComp.type === 18 && rootComp.component) {
+                            const inner = rootComp.component;
+                            if (getCustomId(inner) === fieldId) {
+                                value = extractValue(inner);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
             
             if (value !== undefined) {
                 try {
@@ -159,6 +264,12 @@ export class GradioPlayground {
         });
 
         if (!isLastPage) {
+            // Check if we should skip confirmation and show next modal directly
+            if (session.options?.pageConfirm === false) {
+                await this.showModal(interaction, sessionId, pageIndex + 1);
+                return true;
+            }
+
             let customData: any = {};
             if (typeof this.customizers.pageConfirmation === 'function') {
                 customData = this.customizers.pageConfirmation({ session, interaction, pageIndex, totalPages }) || {};
@@ -244,9 +355,10 @@ export class GradioPlayground {
      */
     async handleButton(interaction: any): Promise<boolean> {
         const customId = interaction.customId;
-        if (!customId || !customId.startsWith('dg_next_')) return false;
+        if (!customId || (!customId.startsWith('dg_next_') && !customId.startsWith('dg_open_modal_'))) return false;
 
         const parts = customId.split('_');
+        // dg_next_sessionId_pageIndex OR dg_open_modal_sessionId_pageIndex
         const sessionId = parts[2];
         const pageIndex = parseInt(parts[3], 10);
 
@@ -283,7 +395,7 @@ export class GradioPlayground {
         let modalData = {
             title: `${session.appReference.split('/').pop()} (Page ${pageIndex + 1}/${totalPages})`,
             custom_id: modalId,
-            components: components
+            components: components // Now using raw objects from ComponentMapper
         };
 
         if (typeof this.customizers.formatModal === 'function') {
@@ -308,53 +420,133 @@ export class GradioPlayground {
     }
 
     /**
-     * Execute Gradio API call
+     * Detect the correct API URL for the Gradio app (Modern V4+ vs Legacy)
+     */
+    private async detectAppApiUrl(baseUrl: string, config: any): Promise<string> {
+        if (config.api_prefix) {
+            let prefix = config.api_prefix;
+            if (!prefix.startsWith('/')) prefix = '/' + prefix;
+            return `${baseUrl}${prefix}`;
+        }
+
+        try {
+            const apiCheck = await fetch(`${baseUrl}/gradio_api/info`);
+            if (apiCheck.ok) return `${baseUrl}/gradio_api`;
+        } catch (e) {}
+
+        return baseUrl;
+    }
+
+    /**
+     * Execute Gradio API call using SSE Queue (Proven logic from katto-messenger)
      */
     private async execute(sessionId: string): Promise<any> {
         const session = this.sessions.get(sessionId);
         if (!session) throw new GradioPlaygroundError(ErrorCodes.SESSION_NOT_FOUND, 'Session not found.');
 
-        const { appApiUrl, fnIndex, values } = session;
+        const { fnIndex, values, baseUrl, targetApiName, appApiUrl } = session;
+        const sessionHash = Math.random().toString(36).substring(2);
 
         try {
-            const client = await GradioClient.connect(appApiUrl);
-            const submission = client.submit(fnIndex, values as any);
+            Logger.info(`[${sessionId}] Connecting to Gradio: ${baseUrl}...`);
+            Logger.info(`[${sessionId}] Inputs:`, JSON.stringify(values, null, 2));
 
-            const outputData: any[] = [];
-            for await (const event of submission) {
-                if (event.type === 'data') {
-                    outputData.push(...(event.data as any[]));
-                }
-            }
-
-            // Extract text and files
-            let textResult = '';
-            const filesToUpload: any[] = [];
-
-            for (const item of outputData) {
-                if (typeof item === 'string') {
-                    textResult += item + '\n';
-                } else if (item && typeof item === 'object' && item.url) {
-                    const buffer = await this.download(item.url);
-                    filesToUpload.push({
-                        buffer,
-                        filename: item.orig_name || 'output.png',
-                        url: item.url
-                    });
-                }
-            }
-
-            return {
-                success: true,
-                data: {
-                    text: textResult.trim(),
-                    files: filesToUpload,
-                    raw: outputData
-                }
+            // 1. Join the queue
+            const payload = {
+                fn_index: fnIndex,
+                session_hash: sessionHash,
+                data: values
             };
 
+            const joinRes = await fetch(`${appApiUrl}/queue/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!joinRes.ok) {
+                const errorText = await joinRes.text();
+                throw new Error(`Queue join failed: ${joinRes.status} ${errorText}`);
+            }
+
+            // 2. Listen to the queue stream
+            return new Promise(async (resolve, reject) => {
+                try {
+                    const dataRes = await fetch(`${appApiUrl}/queue/data?session_hash=${sessionHash}`);
+                    if (!dataRes.ok || !dataRes.body) {
+                        return reject(new Error('Failed to connect to queue stream'));
+                    }
+
+                    const reader = dataRes.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const jsonStr = line.substring(6).trim();
+                                if (!jsonStr || jsonStr === '[DONE]') continue;
+
+                                try {
+                                    const msg = JSON.parse(jsonStr);
+                                    
+                                    if (msg.msg === 'process_completed') {
+                                        if (!msg.success) {
+                                            return reject(new Error('Process failed: ' + JSON.stringify(msg.output)));
+                                        }
+                                        
+                                        // Success! Format the output
+                                        const outputData = msg.output.data;
+                                        let textResult = '';
+                                        const filesToUpload: any[] = [];
+
+                                        for (const item of outputData) {
+                                            if (typeof item === 'string') {
+                                                textResult += item + '\n';
+                                            } else if (item && typeof item === 'object' && (item.url || item.path)) {
+                                                const fileUrl = item.url || `${baseUrl}/file=${item.path}`;
+                                                const buffer = await this.download(fileUrl);
+                                                filesToUpload.push({
+                                                    buffer,
+                                                    filename: item.orig_name || 'output.png',
+                                                    url: fileUrl
+                                                });
+                                            }
+                                        }
+
+                                        resolve({
+                                            success: true,
+                                            data: {
+                                                text: textResult.trim(),
+                                                files: filesToUpload,
+                                                raw: outputData
+                                            }
+                                        });
+                                        return;
+                                    } else if (msg.msg === 'server_error') {
+                                        return reject(new Error(`Server error: ${msg.error}`));
+                                    }
+                                } catch (e) {
+                                    // Skip parse errors
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            });
+
         } catch (error: any) {
-            throw new GradioPlaygroundError(ErrorCodes.INFERENCE_FAILED, error.message);
+            Logger.error(`[${sessionId}] Inference error:`, error);
+            throw new GradioPlaygroundError(ErrorCodes.INFERENCE_FAILED, error.message || 'An error occurred');
         }
     }
 
@@ -364,23 +556,34 @@ export class GradioPlayground {
         switch (component.type) {
             case 'number':
             case 'slider':
-                const num = parseFloat(value);
-                if (isNaN(num)) throw new Error(`${component.label} must be a number.`);
-                if (component.props.minimum !== undefined && num < component.props.minimum) throw new Error(`${component.label} min value is ${component.props.minimum}`);
-                if (component.props.maximum !== undefined && num > component.props.maximum) throw new Error(`${component.label} max value is ${component.props.maximum}`);
+                const num = typeof value === 'string' ? parseFloat(value) : value;
+                if (typeof num !== 'number' || isNaN(num)) return num;
+                
+                if (component.props?.minimum !== undefined && num < component.props.minimum) {
+                    Logger.warn(`Value ${num} is less than minimum ${component.props.minimum} for ${component.label}`);
+                }
+                if (component.props?.maximum !== undefined && num > component.props.maximum) {
+                    Logger.warn(`Value ${num} is greater than maximum ${component.props.maximum} for ${component.label}`);
+                }
                 return num;
 
             case 'checkbox':
-                return value.toLowerCase() === 'y' || value.toLowerCase() === 'yes';
+                if (typeof value === 'boolean') return value;
+                if (typeof value === 'string') return value.toLowerCase() === 'y' || value.toLowerCase() === 'yes' || value.toLowerCase() === 'true';
+                return !!value;
 
             case 'image':
             case 'file':
             case 'audio':
             case 'video':
-                // Auto-upload if it's a URL
-                if (value.startsWith('http')) {
+                // Auto-upload if it's a URL string
+                if (typeof value === 'string' && value.startsWith('http')) {
                     const buffer = await this.download(value);
-                    const filename = value.split('/').pop() || 'file.tmp';
+                    // Extract clean filename (strip query params)
+                    let filename = value.split('/').pop() || 'file.tmp';
+                    if (filename.includes('?')) {
+                        filename = filename.split('?')[0];
+                    }
                     return await this.upload(session.appReference, buffer, filename);
                 }
                 return value;
@@ -413,6 +616,12 @@ export class GradioPlayground {
 
         if (!res.ok) throw new GradioPlaygroundError(ErrorCodes.FILE_UPLOAD_FAILED, `Upload failed: ${res.statusText}`);
         const data: any = await res.json();
-        return Array.isArray(data) ? data[0] : data;
+        const path = Array.isArray(data) ? data[0] : data;
+        
+        return {
+            path,
+            orig_name: filename,
+            meta: { _type: 'gradio.FileData' }
+        };
     }
 }

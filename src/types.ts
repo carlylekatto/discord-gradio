@@ -26,6 +26,7 @@ export interface GradioSession {
     targetApiName: string | null;
     fnIndex: number;
     appApiUrl: string;
+    baseUrl: string;
     inputs: GradioComponent[];
     outputs: GradioComponent[];
     values: any[];
