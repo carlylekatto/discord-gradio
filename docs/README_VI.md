@@ -9,7 +9,7 @@ Thư viện giúp tích hợp nhanh chóng mọi ứng dụng Gradio (Hugging Fa
 - [Tính năng chính](#tính-năng-chính)
 - [Cài đặt](#cài-đặt)
 - [Bắt đầu nhanh](#bắt-đầu-nhanh)
-- [Tùy biến](#tùy-biến)
+- [Tùy biến](#tùy biến)
 - [Nền tảng hỗ trợ](#nền-tảng-hỗ-trợ)
 - [Lưu ý quan trọng](#lưu-ý-quan-trọng)
 - [License](#license)
@@ -97,4 +97,8 @@ await playground.init(interaction, appRef, null, {
 
 ## License
 
-ISC
+Dự án này được phát hành dưới giấy phép **MIT License**.
+
+Bản quyền (c) 2026 カット Katt
+
+Xem file [LICENSE](../LICENSE) để biết thêm chi tiết.

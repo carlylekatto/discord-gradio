@@ -40,7 +40,7 @@
     "name": "カット Katt",
     "url": "https://github.com/carlylekatto"
   },
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@gradio/client": "^2.2.0"
   },

@@ -97,4 +97,8 @@ await playground.init(interaction, appRef, null, {
 
 ## License
 
-ISC
+This project is licensed under the **MIT License**.
+
+Copyright (c) 2026 カット Katt
+
+See the [LICENSE](./LICENSE) file for more details.
