@@ -66,7 +66,7 @@ The library automatically maps Gradio components to the best possible Discord eq
 | `Slider` | `TextInput` | Validates numeric range (Min/Max). |
 | `Number` | `TextInput` | Auto-parses to float/int. |
 | `Dropdown` | `StringSelect` | Uses Modal Type 18 container. |
-| `Radio` | `StringSelect` | Uses Modal Type 18 container. |
+| `Radio` | `RadioGroup` | Single choice from list |
 | `Checkbox` | `Checkbox` | Native Discord Checkbox (Standard 2026). |
 | `Image/File` | `FileUpload` | Resolves Discord attachments to URLs. |
 
@@ -137,7 +137,7 @@ await playground.init(interaction, 'user/space-id', null, {
 });
 ```
 
-### 🪵 Logging System (New in 1.0.4)
+### 🪵 Logging System
 Control library verbosity without changing source code:
 
 ```javascript
@@ -146,6 +146,18 @@ const { GradioPlayground, LogLevel } = require('discord-gradio');
 const playground = new GradioPlayground({
     logLevel: LogLevel.DEBUG // Options: DEBUG, INFO, WARN, ERROR, NONE
 });
+```
+
+### 🧹 Session Lifecycle & Memory Management
+To prevent memory leaks from inactive or abandoned modal sessions, the library features an automatic background cleanup worker (ticks every 1 minute) to evict expired sessions:
+
+```javascript
+const playground = new GradioPlayground({
+    sessionTimeoutMs: 15 * 60 * 1000 // Inactivity timeout in ms before session is evicted (Default: 15 minutes)
+});
+
+// Always call destroy when shutting down the bot to release timers cleanly
+playground.destroy();
 ```
 
 ### 🎨 Advanced Customizers
@@ -226,6 +238,47 @@ const { Logger } = require('discord-gradio');
 **Common Issues:**
 - **Unknown Interaction (10062)**: Occurs if the Gradio connection takes more than 3 seconds before you defer the reply. The library uses raw API calls to minimize this, but extremely slow spaces may still trigger it.
 - **Inference Failed**: Ensure the Space is not private and doesn't require authentication.
+
+---
+
+## 🧪 Testing
+
+The library includes a robust suite of unit tests powered by **Vitest** to ensure high stability and guard against regression.
+
+To run the unit tests once:
+```bash
+npm run test
+```
+
+To run tests in watch mode during development:
+```bash
+npm run test:watch
+```
+
+---
+
+## 🛠️ Development & Contributing
+
+We welcome contributions from the community! To set up the library for local development:
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/carlylekatto/discord-gradio.git
+   cd discord-gradio
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Development Commands:**
+   * **Rebuild on file changes:** `npm run dev`
+   * **Build for production:** `npm run build`
+   * **Run TypeScript linting:** `npm run lint`
+   * **Run Unit Tests:** `npm run test` or `npm run test:watch`
+
+Please make sure all unit tests pass and TypeScript check is clean before submitting a Pull Request!
 
 ---
 

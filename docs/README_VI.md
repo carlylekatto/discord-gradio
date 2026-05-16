@@ -66,7 +66,7 @@ Thư viện tự động ánh xạ các thành phần Gradio sang giao diện Di
 | `Slider` | `TextInput` | Tự động kiểm tra phạm vi số (Min/Max). |
 | `Number` | `TextInput` | Tự động chuyển đổi sang số thực/nguyên. |
 | `Dropdown` | `StringSelect` | Sử dụng container Modal Type 18. |
-| `Radio` | `StringSelect` | Sử dụng container Modal Type 18. |
+| `Radio` | `RadioGroup` | Chọn một mục từ danh sách. |
 | `Checkbox` | `Checkbox` | Checkbox gốc của Discord (Chuẩn 2026). |
 | `Image/File` | `FileUpload` | Tự động lấy URL từ tệp đính kèm Discord. |
 
@@ -135,7 +135,7 @@ await playground.init(interaction, appRef, null, {
 });
 ```
 
-### 🪵 Hệ thống Logging (Mới trong 1.0.4)
+### 🪵 Hệ thống Logging
 Kiểm soát độ chi tiết của log mà không cần sửa mã nguồn:
 
 ```javascript
@@ -144,6 +144,18 @@ const { GradioPlayground, LogLevel } = require('discord-gradio');
 const playground = new GradioPlayground({
     logLevel: LogLevel.DEBUG // Các lựa chọn: DEBUG, INFO, WARN, ERROR, NONE
 });
+```
+
+### 🧹 Vòng đời phiên & Quản lý bộ nhớ
+Để tránh rò rỉ bộ nhớ (Memory Leak) từ các phiên Modal bị người dùng bỏ quên, thư viện tích hợp sẵn trình dọn dẹp tự động chạy ngầm (mỗi 1 phút) để xoá các phiên đã hết hạn:
+
+```javascript
+const playground = new GradioPlayground({
+    sessionTimeoutMs: 15 * 60 * 1000 // Thời gian hết hạn phiên không hoạt động tính bằng ms (Mặc định: 15 phút)
+});
+
+// Luôn gọi destroy() khi dừng bot để giải phóng các bộ hẹn giờ chạy ngầm một cách sạch sẽ
+playground.destroy();
 ```
 
 ### 🎨 Tùy chỉnh nâng cao (Customizers)
@@ -224,6 +236,47 @@ const { Logger } = require('discord-gradio');
 **Các lỗi thường gặp:**
 - **Unknown Interaction (10062)**: Xảy ra nếu việc kết nối Gradio mất hơn 3 giây trước khi bạn `deferReply`. Thư viện sử dụng các lệnh gọi API thô để giảm thiểu việc này, nhưng các Space quá chậm vẫn có thể gặp lỗi.
 - **Inference Failed**: Đảm bảo Space không ở chế độ riêng tư và không yêu cầu đăng nhập.
+
+---
+
+## 🧪 Kiểm thử (Testing)
+
+Thư viện bao gồm một bộ unit test cực kỳ hoàn chỉnh sử dụng **Vitest** để kiểm tra tính năng và chống lỗi tái diễn (regression).
+
+Để chạy tất cả các test một lần duy nhất:
+```bash
+npm run test
+```
+
+Để chạy test ở chế độ theo dõi (watch mode) khi phát triển dự án:
+```bash
+npm run test:watch
+```
+
+---
+
+## 🛠️ Phát triển & Đóng góp (Contributing)
+
+Chúng tôi rất hoan nghênh các đóng góp từ cộng đồng! Để cài đặt và phát triển thư viện cục bộ:
+
+1. **Khởi tạo và nhân bản mã nguồn (Clone repository):**
+   ```bash
+   git clone https://github.com/carlylekatto/discord-gradio.git
+   cd discord-gradio
+   ```
+
+2. **Cài đặt các gói phụ thuộc (Dependencies):**
+   ```bash
+   npm install
+   ```
+
+3. **Các câu lệnh phát triển khả dụng:**
+   * **Tự động biên dịch lại khi thay đổi tệp:** `npm run dev`
+   * **Biên dịch sản phẩm (Production build):** `npm run build`
+   * **Kiểm tra cú pháp và cấu trúc TypeScript (Lint):** `npm run lint`
+   * **Chạy bộ kiểm thử (Unit Tests):** `npm run test` hoặc `npm run test:watch`
+
+Vui lòng đảm bảo rằng tất cả các bài kiểm tra tự động đều vượt qua (passed) và trình kiểm tra TypeScript không phát hiện lỗi nào trước khi gửi Pull Request!
 
 ---
 

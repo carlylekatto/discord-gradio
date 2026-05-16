@@ -20,10 +20,13 @@ export class ConfigParser {
         }
         
         // 3. Handle Hugging Face Space IDs (user/space-name)
-        if (url.includes('/') && !url.includes('.')) {
-            const [user, space] = url.split('/');
-            // Convert to the direct .hf.space subdomain which is more reliable for API
-            return `https://${user.toLowerCase()}-${space.toLowerCase().replace(/_/g, '-')}.hf.space`;
+        if (url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
+            const parts = url.split('/');
+            if (parts.length === 2) {
+                const [user, space] = parts;
+                // Convert to the direct .hf.space subdomain which is more reliable for API
+                return `https://${user.toLowerCase()}-${space.toLowerCase().replace(/_/g, '-').replace(/\./g, '-')}.hf.space`;
+            }
         }
 
         // 4. Default fallback

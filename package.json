@@ -1,6 +1,6 @@
 {
   "name": "discord-gradio",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A stateless engine to bridge any Gradio App (HF Spaces, Shared Links) to Discord Modals with zero-config.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -22,6 +22,8 @@
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
     "lint": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -40,6 +42,10 @@
     "name": "カット Katt",
     "url": "https://github.com/carlylekatto"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/carlylekatto/discord-gradio"
+  },
   "license": "MIT",
   "peerDependencies": {
     "discord.js": "^14.0.0"
@@ -49,6 +55,7 @@
     "discord.js": "^14.26.4",
     "dotenv": "^16.4.5",
     "tsup": "^8.0.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.6"
   }
 }

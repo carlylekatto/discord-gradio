@@ -20,15 +20,54 @@ export class GradioPlayground {
     private sessions: Map<string, GradioSession>;
     private embedFactory: typeof EmbedFactory;
     private customizers: Customizers;
+    private cleanupInterval?: NodeJS.Timeout;
+    private sessionTimeoutMs: number;
 
-    constructor(options: { customizers?: Customizers, logLevel?: any } = {}) {
+    constructor(options: { customizers?: Customizers, logLevel?: any, sessionTimeoutMs?: number } = {}) {
         this.sessions = new Map();
         this.embedFactory = EmbedFactory;
         this.customizers = options.customizers || {};
+        this.sessionTimeoutMs = options.sessionTimeoutMs || 15 * 60 * 1000; // Default: 15 minutes
         
         if (options.logLevel !== undefined) {
             Logger.setLevel(options.logLevel);
         }
+
+        this.startCleanupInterval();
+    }
+
+    private startCleanupInterval() {
+        this.cleanupInterval = setInterval(() => {
+            const now = Date.now();
+            for (const [sessionId, session] of this.sessions.entries()) {
+                const age = now - (session.lastAccessedAt || session.createdAt || now);
+                if (age > this.sessionTimeoutMs) {
+                    Logger.info(`[Cleanup] Session ${sessionId} expired after ${Math.round(age / 1000)}s.`);
+                    this.sessions.delete(sessionId);
+                }
+            }
+        }, 60 * 1000); // Check every minute
+
+        if (this.cleanupInterval && typeof this.cleanupInterval.unref === 'function') {
+            this.cleanupInterval.unref(); // Don't block process exit
+        }
+    }
+
+    /**
+     * Stop cleanup interval on shutdown
+     */
+    destroy() {
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+        }
+    }
+
+    private getSession(sessionId: string): GradioSession | undefined {
+        const session = this.sessions.get(sessionId);
+        if (session) {
+            session.lastAccessedAt = Date.now();
+        }
+        return session;
     }
 
     /**
@@ -92,7 +131,9 @@ export class GradioPlayground {
                     return acc;
                 }, {} as Record<number, any>),
                 ephemeral: isEphemeral,
-                options
+                options,
+                createdAt: Date.now(),
+                lastAccessedAt: Date.now()
             });
 
             // 4. Handle Modal Display
@@ -162,7 +203,7 @@ export class GradioPlayground {
         if (!decoded) return false;
 
         const { sessionId, pageIndex } = decoded;
-        const session = this.sessions.get(sessionId);
+        const session = this.getSession(sessionId);
         if (!session) return false;
 
         const pageSize = 5;
@@ -416,7 +457,7 @@ export class GradioPlayground {
             return true;
         } catch (error: any) {
             Logger.error('Error handling button click:', error);
-            const session = this.sessions.get(sessionId);
+            const session = this.getSession(sessionId);
             let errorReply = { 
                 content: 'Failed to open next page.', 
                 flags: session?.ephemeral ? 64 : undefined 
@@ -430,7 +471,7 @@ export class GradioPlayground {
      * Show a Modal for a specific page
      */
     private async showModal(interaction: any, sessionId: string, pageIndex: number) {
-        const session = this.sessions.get(sessionId);
+        const session = this.getSession(sessionId);
         if (!session) throw new GradioPlaygroundError(ErrorCodes.SESSION_NOT_FOUND, 'Session expired or not found.');
 
         const pageSize = 5;
@@ -493,7 +534,7 @@ export class GradioPlayground {
      * Execute Gradio API call using SSE Queue (Proven logic from katto-messenger)
      */
     private async execute(sessionId: string): Promise<any> {
-        const session = this.sessions.get(sessionId);
+        const session = this.getSession(sessionId);
         if (!session) throw new GradioPlaygroundError(ErrorCodes.SESSION_NOT_FOUND, 'Session not found.');
 
         const { fnIndex, values, baseUrl, targetApiName, appApiUrl } = session;
