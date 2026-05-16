@@ -128,11 +128,51 @@ Các tùy chọn cho từng phiên cụ thể có thể được truyền vào p
 
 ```javascript
 await playground.init(interaction, appRef, null, {
-    ephemeral: true,    // Chỉ người dùng thực hiện mới thấy kết quả
-    language: 'vi',      // Ngôn ngữ ưu tiên cho các nhãn
-    manualBridge: true  // Không tự động gửi nút cầu nối (dùng kết hợp với getOpenModalId)
+    ephemeral: true,    // Chỉ người dùng thấy kết quả
+    language: 'vi',      // Ngôn ngữ ưu tiên cho nhãn
+    manualBridge: false, // Đặt thành true nếu bạn muốn tự xử lý tin nhắn cầu nối
+    formatReply: (result) => ({ content: "Kết quả đã sẵn sàng!" }) // Định dạng kết quả tùy chỉnh
 });
 ```
+
+### 🪵 Hệ thống Logging (Mới trong 1.0.4)
+Kiểm soát độ chi tiết của log mà không cần sửa mã nguồn:
+
+```javascript
+const { GradioPlayground, LogLevel } = require('discord-gradio');
+
+const playground = new GradioPlayground({
+    logLevel: LogLevel.DEBUG // Các lựa chọn: DEBUG, INFO, WARN, ERROR, NONE
+});
+```
+
+### 🎨 Tùy chỉnh nâng cao (Customizers)
+
+Tùy chỉnh mọi khía cạnh của giao diện:
+
+```javascript
+const playground = new GradioPlayground({
+    customizers: {
+        // Tùy chỉnh mô tả/gợi ý cho mỗi ô nhập liệu
+        inputDescription: ({ component }) => `Nhập giá trị cho ${component.props.label}`,
+        
+        // Toàn quyền kiểm soát JSON Modal thô trước khi gửi tới Discord
+        formatModal: (modalData, session, pageIndex) => {
+            modalData.title = `✨ Magic Prompt (${pageIndex + 1})`;
+            return modalData;
+        },
+
+        // Tin nhắn đang xử lý tùy chỉnh
+        loading: ({ session }) => ({ embeds: [{ title: "Đang xử lý...", color: 0x3498db }] }),
+        
+        // Xử lý lỗi tùy chỉnh
+        error: ({ error }) => ({ content: `❌ Lỗi: ${error.message}` })
+    }
+});
+```
+
+### 🔢 Nhập số thông minh
+Đối với các linh kiện `number` và `slider`, thư viện sẽ tự động thêm thông tin về khoảng giá trị và bước nhảy vào phần mô tả (ví dụ: `(R: 0-100, S: 1)`), giúp người dùng luôn nhập đúng giới hạn.
 
 ---
 

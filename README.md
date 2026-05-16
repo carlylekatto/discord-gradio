@@ -132,9 +132,49 @@ Options for specific sessions can be passed to the `init` method:
 await playground.init(interaction, 'user/space-id', null, {
     ephemeral: true,    // Only the user sees the output
     language: 'en',      // Preferred language for labels
-    manualBridge: true  // Don't auto-send the bridge button (use with getOpenModalId)
+    manualBridge: false, // Set to true to handle the bridge message yourself
+    formatReply: (result) => ({ content: "Result ready!" }) // Custom result formatter
 });
 ```
+
+### 🪵 Logging System (New in 1.0.4)
+Control library verbosity without changing source code:
+
+```javascript
+const { GradioPlayground, LogLevel } = require('discord-gradio');
+
+const playground = new GradioPlayground({
+    logLevel: LogLevel.DEBUG // Options: DEBUG, INFO, WARN, ERROR, NONE
+});
+```
+
+### 🎨 Advanced Customizers
+
+Customize every aspect of the UI:
+
+```javascript
+const playground = new GradioPlayground({
+    customizers: {
+        // Customize the description/placeholder for each input
+        inputDescription: ({ component }) => `Enter value for ${component.props.label}`,
+        
+        // Full control over the raw Modal JSON before sending to Discord
+        formatModal: (modalData, session, pageIndex) => {
+            modalData.title = `✨ Magic Prompt (${pageIndex + 1})`;
+            return modalData;
+        },
+
+        // Custom loading message
+        loading: ({ session }) => ({ embeds: [{ title: "Processing...", color: 0x3498db }] }),
+        
+        // Custom error handling
+        error: ({ error }) => ({ content: `❌ Oops: ${error.message}` })
+    }
+});
+```
+
+### 🔢 Smart Numeric Inputs
+For `number` and `slider` components, the library automatically appends range and step information to the description (e.g., `(R: 0-100, S: 1)`), ensuring users stay within bounds.
 
 ---
 
