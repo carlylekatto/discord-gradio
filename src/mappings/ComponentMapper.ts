@@ -12,21 +12,56 @@ export class ComponentMapper {
         const { type, index, props } = component;
         const translations = session.translations || {};
 
-        const rawLabel = props.label || props.info || props.name || type || '';
+        // 1. Core Label
+        const rawLabel = props.label || props.name || type || '';
         let label = this._formatText(rawLabel, translations);
         
-        // Beautify if it's a technical name (no spaces, all lowercase)
-        if (label && !label.includes(' ') && label === label.toLowerCase()) {
-            label = label.charAt(0).toUpperCase() + label.slice(1).replace(/[_-]/g, ' ');
-        }
-
-        if (!label) label = `Input ${index}`;
-
+        // Final Truncation (Discord Label Limit: 45)
         if (label.length > 45) {
             label = label.substring(0, 42) + '...';
         }
 
+        if (!label) label = `Input ${index}`;
+
         const customId = IdManager.encodeFieldId(session.sessionId, index, type);
+        
+        // 2. Description (Instructions)
+        let rawInfo = props.info || '';
+        
+        // Auto-append range for number/slider
+        if (type === 'slider' || type === 'number') {
+            const rangeInfo = [];
+            if (props.minimum !== undefined && props.maximum !== undefined) {
+                rangeInfo.push(`R: ${props.minimum}-${props.maximum}`);
+            }
+            if (props.step !== undefined) {
+                rangeInfo.push(`S: ${props.step}`);
+            }
+            if (rangeInfo.length > 0) {
+                const badge = `(${rangeInfo.join(', ')})`;
+                if (rawInfo) {
+                    const limit = 99 - badge.length;
+                    if (rawInfo.length > limit) {
+                        rawInfo = rawInfo.substring(0, limit - 3) + '...' + badge;
+                    } else {
+                        rawInfo = `${rawInfo} ${badge}`;
+                    }
+                } else {
+                    rawInfo = badge;
+                }
+            }
+        }
+
+        const description = this._formatText(rawInfo, translations);
+
+        // 3. Placeholder (Suggestions)
+        let customDescription = undefined;
+        if (typeof customizers.inputDescription === 'function') {
+            customDescription = customizers.inputDescription({ session, component, interaction });
+        }
+
+        // Strictly separate: placeholder only takes placeholder or default prompt
+        const placeholder = customDescription || this._formatText(props.placeholder || '', translations) || `Enter ${label}`;
 
         // 2026 Standard for Modals:
         // Root components can be Type 1 (ActionRow), 10 (Section/TextDisplay), or 18 (Label).
@@ -38,11 +73,12 @@ export class ComponentMapper {
                 return {
                     type: 18, // Label Container
                     label: label,
+                    ...(description ? { description: description.substring(0, 100) } : {}),
                     component: {
                         type: ComponentType.TextInput, // Type 4
                         custom_id: customId,
                         style: TextInputStyle.Short,
-                        placeholder: this._formatText(props.placeholder || '', translations) || `Enter ${label}`,
+                        placeholder: placeholder.substring(0, 100),
                         value: props.value?.toString() || '',
                         required: false
                     }
@@ -55,6 +91,7 @@ export class ComponentMapper {
                 return {
                     type: 18, // Label Container
                     label: label,
+                    ...(description ? { description: description.substring(0, 100) } : {}),
                     component: {
                         type: ComponentType.FileUpload, // Type 19
                         custom_id: customId,
@@ -66,6 +103,7 @@ export class ComponentMapper {
                 return {
                     type: 18, // Label Container
                     label: label,
+                    ...(description ? { description: description.substring(0, 100) } : {}),
                     component: {
                         type: ComponentType.Checkbox, // Type 23
                         custom_id: customId,
@@ -81,6 +119,7 @@ export class ComponentMapper {
                 return {
                     type: 18, // Label Container
                     label: label,
+                    ...(description ? { description: description.substring(0, 100) } : {}),
                     component: {
                         type: isMulti ? ComponentType.CheckboxGroup : ComponentType.RadioGroup,
                         custom_id: customId,

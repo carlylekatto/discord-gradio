@@ -21,10 +21,14 @@ export class GradioPlayground {
     private embedFactory: typeof EmbedFactory;
     private customizers: Customizers;
 
-    constructor(options: { customizers?: Customizers } = {}) {
+    constructor(options: { customizers?: Customizers, logLevel?: any } = {}) {
         this.sessions = new Map();
         this.embedFactory = EmbedFactory;
         this.customizers = options.customizers || {};
+        
+        if (options.logLevel !== undefined) {
+            Logger.setLevel(options.logLevel);
+        }
     }
 
     /**
@@ -51,6 +55,12 @@ export class GradioPlayground {
         const language = options.language || 'en';
 
         try {
+            // Smart Defer: If not already handled, defer now to protect against config fetch timeouts.
+            // This will trigger the "Bridge Button" flow later in this method.
+            if (!interaction.deferred && !interaction.replied) {
+                await interaction.deferReply({ flags: isEphemeral ? 64 : undefined });
+            }
+
             // 1. Fetch Config
             const baseUrl = ConfigParser.normalizeUrl(appReference);
             const config = await ConfigParser.fetchConfig(baseUrl);
@@ -73,7 +83,14 @@ export class GradioPlayground {
                 inputs,
                 outputs,
                 translations: parsed.translations || {},
-                values: new Array(inputs.length).fill(null),
+                values: inputs.reduce((acc, input) => {
+                    const val = input.props?.value;
+                    if (val !== undefined) acc[input.index] = val;
+                    else if (input.type === 'slider' || input.type === 'number') acc[input.index] = input.props?.minimum ?? 0;
+                    else if (input.type === 'checkbox') acc[input.index] = false;
+                    else if (input.type === 'textbox') acc[input.index] = "";
+                    return acc;
+                }, {} as Record<number, any>),
                 ephemeral: isEphemeral,
                 options
             });
@@ -82,7 +99,6 @@ export class GradioPlayground {
             if (interaction.deferred || interaction.replied) {
                 // If developer wants to handle the bridge message manually, we stop here.
                 if (options.manualBridge === true) {
-                    Logger.info(`[${sessionId}] Manual bridge mode enabled. Session initialized.`);
                     return;
                 }
 
@@ -153,12 +169,12 @@ export class GradioPlayground {
         const totalPages = Math.ceil(session.inputs.length / pageSize);
         const isLastPage = pageIndex + 1 >= totalPages;
 
-        if (isLastPage) {
+        // Smart Defer: Only defer if the developer hasn't already done so
+        if (!interaction.deferred && !interaction.replied) {
             await interaction.deferReply({ flags: session.ephemeral ? 64 : undefined });
         }
 
         // Extract values
-        const submittedValues: any[] = [];
         for (let i = 0; i < session.inputs.length; i++) {
             const input = session.inputs[i];
             const type = input.type;
@@ -236,7 +252,8 @@ export class GradioPlayground {
             
             if (value !== undefined) {
                 try {
-                    submittedValues[i] = await this.validateAndTransform(session.inputs[i], value, session);
+                    const transformed = await this.validateAndTransform(session.inputs[i], value, session);
+                    session.values[index] = transformed;
                 } catch (error: any) {
                     let errorReply;
                     if (typeof this.customizers.error === 'function') {
@@ -258,18 +275,7 @@ export class GradioPlayground {
             }
         }
 
-        // Merge values
-        submittedValues.forEach((val, idx) => {
-            if (val !== undefined) session.values[idx] = val;
-        });
-
         if (!isLastPage) {
-            // Check if we should skip confirmation and show next modal directly
-            if (session.options?.pageConfirm === false) {
-                await this.showModal(interaction, sessionId, pageIndex + 1);
-                return true;
-            }
-
             let customData: any = {};
             if (typeof this.customizers.pageConfirmation === 'function') {
                 customData = this.customizers.pageConfirmation({ session, interaction, pageIndex, totalPages }) || {};
@@ -284,7 +290,32 @@ export class GradioPlayground {
                 replyOptions.content = customData.content;
                 replyOptions.embeds = customData.embeds;
             } else {
-                replyOptions.content = `Page ${pageIndex + 1} completed. Click below to continue.`;
+                // Default Summary Embed
+                const pageSize = 5; // DISCORD_MODAL_PAGE_SIZE
+                const currentPageInputs = session.inputs.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
+                
+                const summaryFields = currentPageInputs.map(input => {
+                    let val = session.values[input.index];
+                    let displayVal = val;
+                    
+                    if (val === null || val === undefined || val === '') displayVal = '*Empty*';
+                    else if (typeof val === 'object' && val.path) displayVal = `📁 ${val.orig_name || val.path.split('/').pop()}`;
+                    else if (typeof val === 'boolean') displayVal = val ? '✅ Yes' : '❌ No';
+                    else displayVal = val.toString();
+
+                    return {
+                        name: input.label || input.type,
+                        value: displayVal.length > 100 ? displayVal.substring(0, 97) + '...' : displayVal,
+                        inline: true
+                    };
+                });
+
+                replyOptions.embeds = [{
+                    title: `✅ Page ${pageIndex + 1} Saved`,
+                    description: `You've completed step ${pageIndex + 1} of ${totalPages}. Review your inputs below:`,
+                    fields: summaryFields,
+                    color: 0x2ecc71 // Success Green
+                }];
             }
 
             const nextButtonId = `dg_next_${sessionId}_${pageIndex + 1}`;
@@ -303,7 +334,11 @@ export class GradioPlayground {
                 }
             ];
 
-            await interaction.reply(replyOptions);
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(replyOptions);
+            } else {
+                await interaction.reply(replyOptions);
+            }
         } else {
             // Final page
             let loadingReply;
@@ -312,7 +347,12 @@ export class GradioPlayground {
             } else {
                 loadingReply = { embeds: [this.embedFactory.createLoadingEmbed(session.appReference)] };
             }
-            await interaction.editReply(loadingReply);
+
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply(loadingReply);
+            } else {
+                await interaction.reply(loadingReply);
+            }
 
             try {
                 const result = await this.execute(sessionId);
@@ -357,10 +397,19 @@ export class GradioPlayground {
         const customId = interaction.customId;
         if (!customId || (!customId.startsWith('dg_next_') && !customId.startsWith('dg_open_modal_'))) return false;
 
+        let sessionId: string;
+        let pageIndex: number;
+
         const parts = customId.split('_');
-        // dg_next_sessionId_pageIndex OR dg_open_modal_sessionId_pageIndex
-        const sessionId = parts[2];
-        const pageIndex = parseInt(parts[3], 10);
+        if (customId.startsWith('dg_next_')) {
+            // dg_next_sessionId_pageIndex
+            sessionId = parts[2];
+            pageIndex = parseInt(parts[3], 10);
+        } else {
+            // dg_open_modal_sessionId_pageIndex
+            sessionId = parts[3];
+            pageIndex = parseInt(parts[4], 10);
+        }
 
         try {
             await this.showModal(interaction, sessionId, pageIndex);
@@ -392,15 +441,18 @@ export class GradioPlayground {
         const modalId = IdManager.encodeModalId(sessionId, pageIndex);
         const components = pagedInputs.map(input => ComponentMapper.mapComponent(input, session, this.customizers, interaction));
 
-        let modalData = {
+        let modalData: any = {
             title: `${session.appReference.split('/').pop()} (Page ${pageIndex + 1}/${totalPages})`,
             custom_id: modalId,
-            components: components // Now using raw objects from ComponentMapper
+            components: components
         };
 
+        // Allow developer to customize the full modal data
         if (typeof this.customizers.formatModal === 'function') {
             const customModal = this.customizers.formatModal(modalData, session, pageIndex);
-            if (customModal) modalData = customModal;
+            if (customModal) {
+                modalData = customModal;
+            }
         }
 
         // Use raw Discord API to bypass discord.js limitation (Modal must be first response)
@@ -447,15 +499,27 @@ export class GradioPlayground {
         const { fnIndex, values, baseUrl, targetApiName, appApiUrl } = session;
         const sessionHash = Math.random().toString(36).substring(2);
 
+        // 3. Prepare data for Gradio
+        const data = session.inputs.map(input => {
+            const val = session.values[input.index];
+            if (val !== undefined && val !== null) return val;
+            
+            // Fallbacks for missing values
+            if (input.type === 'slider' || input.type === 'number') return input.props?.minimum ?? 0;
+            if (input.type === 'checkbox') return false;
+            if (input.type === 'textbox') return "";
+            return null;
+        });
+
+        Logger.debug(`[${sessionId}] Gradio Payload:`, JSON.stringify(data, null, 2));
+
         try {
             Logger.info(`[${sessionId}] Connecting to Gradio: ${baseUrl}...`);
-            Logger.info(`[${sessionId}] Inputs:`, JSON.stringify(values, null, 2));
-
             // 1. Join the queue
             const payload = {
                 fn_index: fnIndex,
                 session_hash: sessionHash,
-                data: values
+                data: data
             };
 
             const joinRes = await fetch(`${appApiUrl}/queue/join`, {

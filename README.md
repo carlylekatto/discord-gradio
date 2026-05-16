@@ -132,7 +132,6 @@ Options for specific sessions can be passed to the `init` method:
 await playground.init(interaction, 'user/space-id', null, {
     ephemeral: true,    // Only the user sees the output
     language: 'en',      // Preferred language for labels
-    pageConfirm: false, // Skip the confirmation message between pages
     manualBridge: true  // Don't auto-send the bridge button (use with getOpenModalId)
 });
 ```

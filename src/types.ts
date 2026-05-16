@@ -29,7 +29,7 @@ export interface GradioSession {
     baseUrl: string;
     inputs: GradioComponent[];
     outputs: GradioComponent[];
-    values: any[];
+    values: Record<number, any>;
     translations: Record<string, string>;
     ephemeral: boolean;
     options?: any;

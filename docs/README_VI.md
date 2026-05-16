@@ -130,7 +130,6 @@ Các tùy chọn cho từng phiên cụ thể có thể được truyền vào p
 await playground.init(interaction, appRef, null, {
     ephemeral: true,    // Chỉ người dùng thực hiện mới thấy kết quả
     language: 'vi',      // Ngôn ngữ ưu tiên cho các nhãn
-    pageConfirm: false, // Bỏ qua tin nhắn xác nhận giữa các trang Modal
     manualBridge: true  // Không tự động gửi nút cầu nối (dùng kết hợp với getOpenModalId)
 });
 ```

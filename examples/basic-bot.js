@@ -6,13 +6,14 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 require('dotenv').config();
 
-const { GradioPlayground, ConfigParser, ErrorCodes } = require('../dist');
+const { GradioPlayground, LogLevel } = require('../dist');
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds]
 });
 
 const playground = new GradioPlayground({
+    logLevel: LogLevel.DEBUG,
     customizers: {
         loading: ({ session }) => {
             return { 
@@ -134,6 +135,8 @@ client.on('interactionCreate', async interaction => {
     
     else if (interaction.isModalSubmit()) {
         try {
+            // Always defer for modal submit if you expect slow processing (uploads/inference)
+            await interaction.deferReply({ ephemeral: true }); 
             const handled = await playground.handleSubmit(interaction);
             if (handled) console.log(`✅ Handled Modal: ${interaction.customId}`);
         } catch (error) {
