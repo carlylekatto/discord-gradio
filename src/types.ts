@@ -33,6 +33,7 @@ export interface GradioSession {
     translations: Record<string, string>;
     ephemeral: boolean;
     options?: any;
+    customizers?: Customizers;
     createdAt?: number;
     lastAccessedAt?: number;
 }

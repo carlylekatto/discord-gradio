@@ -133,7 +133,9 @@ await playground.init(interaction, 'user/space-id', null, {
     ephemeral: true,    // Only the user sees the output
     language: 'en',      // Preferred language for labels
     manualBridge: false, // Set to true to handle the bridge message yourself
-    formatReply: (result) => ({ content: "Result ready!" }) // Custom result formatter
+    customizers: {
+        result: ({ result }) => ({ content: "Result ready!" }) // Custom result formatter
+    }
 });
 ```
 

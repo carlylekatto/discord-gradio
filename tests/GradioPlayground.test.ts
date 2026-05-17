@@ -40,4 +40,32 @@ describe('GradioPlayground', () => {
         playground.destroy();
         vi.useRealTimers();
     });
+
+    it('should correctly merge global and session-specific customizers', () => {
+        const globalLoader = () => 'global_loader';
+        const globalResult = () => 'global_result';
+        const sessionResult = () => 'session_result';
+
+        const playground = new GradioPlayground({
+            customizers: {
+                loading: globalLoader,
+                result: globalResult
+            }
+        });
+
+        const mockSession: any = {
+            sessionId: 'test_session',
+            customizers: {
+                result: sessionResult
+            }
+        };
+
+        const merged = (playground as any).getMergedCustomizers(mockSession);
+        
+        // Assertions: loading should fall back to global, result should be overridden by session
+        expect(merged.loading).toBe(globalLoader);
+        expect(merged.result).toBe(sessionResult);
+
+        playground.destroy();
+    });
 });

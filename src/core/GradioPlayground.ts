@@ -70,6 +70,13 @@ export class GradioPlayground {
         return session;
     }
 
+    private getMergedCustomizers(session: GradioSession): Customizers {
+        return {
+            ...this.customizers,
+            ...session.customizers
+        };
+    }
+
     /**
      * Get the standard customId for the bridge button that opens the first modal page.
      * Use this if you want to build your own custom bridge message.
@@ -132,6 +139,7 @@ export class GradioPlayground {
                 }, {} as Record<number, any>),
                 ephemeral: isEphemeral,
                 options,
+                customizers: options.customizers,
                 createdAt: Date.now(),
                 lastAccessedAt: Date.now()
             });
@@ -296,9 +304,10 @@ export class GradioPlayground {
                     const transformed = await this.validateAndTransform(session.inputs[i], value, session);
                     session.values[index] = transformed;
                 } catch (error: any) {
+                    const mergedCustomizers = this.getMergedCustomizers(session);
                     let errorReply;
-                    if (typeof this.customizers.error === 'function') {
-                        errorReply = this.customizers.error({ error, session, interaction });
+                    if (typeof mergedCustomizers.error === 'function') {
+                        errorReply = mergedCustomizers.error({ error, session, interaction });
                     } else {
                         errorReply = { 
                             content: `⚠️ **Validation Error:** ${error.message}`, 
@@ -317,9 +326,10 @@ export class GradioPlayground {
         }
 
         if (!isLastPage) {
+            const mergedCustomizers = this.getMergedCustomizers(session);
             let customData: any = {};
-            if (typeof this.customizers.pageConfirmation === 'function') {
-                customData = this.customizers.pageConfirmation({ session, interaction, pageIndex, totalPages }) || {};
+            if (typeof mergedCustomizers.pageConfirmation === 'function') {
+                customData = mergedCustomizers.pageConfirmation({ session, interaction, pageIndex, totalPages }) || {};
             }
 
             const isEphemeral = session.ephemeral;
@@ -382,9 +392,10 @@ export class GradioPlayground {
             }
         } else {
             // Final page
+            const mergedCustomizers = this.getMergedCustomizers(session);
             let loadingReply;
-            if (typeof this.customizers.loading === 'function') {
-                loadingReply = this.customizers.loading({ session, interaction });
+            if (typeof mergedCustomizers.loading === 'function') {
+                loadingReply = mergedCustomizers.loading({ session, interaction });
             } else {
                 loadingReply = { embeds: [this.embedFactory.createLoadingEmbed(session.appReference)] };
             }
@@ -399,10 +410,8 @@ export class GradioPlayground {
                 const result = await this.execute(sessionId);
                 let replyData;
 
-                if (session.options?.formatReply) {
-                    replyData = session.options.formatReply(result);
-                } else if (typeof this.customizers.result === 'function') {
-                    replyData = this.customizers.result({ result, session, interaction });
+                if (typeof mergedCustomizers.result === 'function') {
+                    replyData = mergedCustomizers.result({ result, session, interaction });
                 } else {
                     const embed = this.embedFactory.createResultEmbed(result, session.appReference);
                     replyData = {
@@ -420,8 +429,8 @@ export class GradioPlayground {
             } catch (error: any) {
                 Logger.error('Error during Gradio execution:', error);
                 let errorReply;
-                if (typeof this.customizers.error === 'function') {
-                    errorReply = this.customizers.error({ error, session, interaction });
+                if (typeof mergedCustomizers.error === 'function') {
+                    errorReply = mergedCustomizers.error({ error, session, interaction });
                 } else {
                     errorReply = { embeds: [this.embedFactory.createErrorEmbed(error)] };
                 }
@@ -480,7 +489,8 @@ export class GradioPlayground {
         const pagedInputs = inputs.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
 
         const modalId = IdManager.encodeModalId(sessionId, pageIndex);
-        const components = pagedInputs.map(input => ComponentMapper.mapComponent(input, session, this.customizers, interaction));
+        const mergedCustomizers = this.getMergedCustomizers(session);
+        const components = pagedInputs.map(input => ComponentMapper.mapComponent(input, session, mergedCustomizers, interaction));
 
         let modalData: any = {
             title: `${session.appReference.split('/').pop()} (Page ${pageIndex + 1}/${totalPages})`,
@@ -489,8 +499,8 @@ export class GradioPlayground {
         };
 
         // Allow developer to customize the full modal data
-        if (typeof this.customizers.formatModal === 'function') {
-            const customModal = this.customizers.formatModal(modalData, session, pageIndex);
+        if (typeof mergedCustomizers.formatModal === 'function') {
+            const customModal = mergedCustomizers.formatModal(modalData, session, pageIndex);
             if (customModal) {
                 modalData = customModal;
             }

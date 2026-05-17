@@ -131,7 +131,9 @@ await playground.init(interaction, appRef, null, {
     ephemeral: true,    // Chỉ người dùng thấy kết quả
     language: 'vi',      // Ngôn ngữ ưu tiên cho nhãn
     manualBridge: false, // Đặt thành true nếu bạn muốn tự xử lý tin nhắn cầu nối
-    formatReply: (result) => ({ content: "Kết quả đã sẵn sàng!" }) // Định dạng kết quả tùy chỉnh
+    customizers: {
+        result: ({ result }) => ({ content: "Kết quả đã sẵn sàng!" }) // Định dạng kết quả tùy chỉnh
+    }
 });
 ```
 

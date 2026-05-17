@@ -121,12 +121,14 @@ client.on('interactionCreate', async interaction => {
             try {
                 await playground.init(interaction, 'eienmojiki-colorextractor', 'extract_colors', {
                     ephemeral: false,
-                    formatReply: (result) => {
-                        const hexCodes = result.data.text.match(/#[0-9A-Fa-f]{6}/g) || [];
-                        const unique = [...new Set(hexCodes)];
-                        return { 
-                            content: `🎨 **Extracted Colors:**\n${unique.join(', ') || 'None found.'}` 
-                        };
+                    customizers: {
+                        result: ({ result }) => {
+                            const hexCodes = result.data.text.match(/#[0-9A-Fa-f]{6}/g) || [];
+                            const unique = [...new Set(hexCodes)];
+                            return { 
+                                content: `🎨 **Extracted Colors:**\n${unique.join(', ') || 'None found.'}` 
+                            };
+                        }
                     }
                 });
             } catch (e) {}
