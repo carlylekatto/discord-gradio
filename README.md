@@ -1,11 +1,27 @@
-# 🤖 Discord Gradio Integration
+<p align="center">
+  <img src="./docs/discord-gradio.png" alt="Discord Gradio" width="400" />
+</p>
 
-[![npm version](https://img.shields.io/npm/v/discord-gradio.svg)](https://www.npmjs.com/package/discord-gradio)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<h1 align="center">🤖 Discord Gradio Integration</h1>
 
-Transform any **Gradio App** (Hugging Face, Shared Links, or Custom Domains) into a fully functional **Discord Interface** with zero configuration. Optimized for modern Discord standards and performance.
+<p align="center">
+  <a href="https://www.npmjs.com/package/discord-gradio">
+    <img src="https://img.shields.io/npm/v/discord-gradio.svg" alt="npm version" />
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  </a>
+</p>
 
-[Tiếng Việt](./docs/README_VI.md)
+<p align="center">
+  Transform any <b>Gradio App</b> (Hugging Face, Shared Links, or Custom Domains) into a fully functional <b>Discord Interface</b> with zero configuration. Optimized for modern Discord standards and performance.
+</p>
+
+<p align="center">
+  <a href="./docs/README_VI.md"><b>Tiếng Việt 🇻🇳</b></a>
+</p>
+
+---
 
 ## 📖 Table of Contents
 - [🌟 Why Discord-Gradio?](#-why-discord-gradio)

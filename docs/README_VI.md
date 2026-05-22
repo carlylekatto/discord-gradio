@@ -1,11 +1,27 @@
-# 🤖 Tích hợp Discord với Gradio
+<p align="center">
+  <img src="./discord-gradio.png" alt="Discord Gradio" width="400" />
+</p>
 
-[![npm version](https://img.shields.io/npm/v/discord-gradio.svg)](https://www.npmjs.com/package/discord-gradio)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<h1 align="center">🤖 Tích hợp Discord với Gradio</h1>
 
-Chuyển đổi bất kỳ **Gradio App** nào (Hugging Face, Link chia sẻ, hoặc Tên miền riêng) thành một **Giao diện Discord** hoàn chỉnh mà không cần cấu hình phức tạp. Được tối ưu hóa cho các tiêu chuẩn Discord hiện đại và hiệu suất cao.
+<p align="center">
+  <a href="https://www.npmjs.com/package/discord-gradio">
+    <img src="https://img.shields.io/npm/v/discord-gradio.svg" alt="npm version" />
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  </a>
+</p>
 
-[English](../README.md)
+<p align="center">
+  Chuyển đổi bất kỳ <b>Gradio App</b> nào (Hugging Face, Link chia sẻ, hoặc Tên miền riêng) thành một <b>Giao diện Discord</b> hoàn chỉnh mà không cần cấu hình phức tạp. Được tối ưu hóa cho các tiêu chuẩn Discord hiện đại và hiệu suất cao.
+</p>
+
+<p align="center">
+  <a href="../README.md"><b>English 🇬🇧</b></a>
+</p>
+
+---
 
 ## 📖 Mục lục
 - [🌟 Tại sao nên dùng Discord-Gradio?](#-tại-sao-nên-dùng-discord-gradio)
