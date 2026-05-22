@@ -99,7 +99,7 @@ export class GradioPlayground {
     async init(interaction: any, appReference: string, targetApiName: string | null = null, options: any = {}) {
         const sessionId = interaction.id;
         const isEphemeral = options.ephemeral !== false; 
-        const language = options.language || 'en';
+        const language = options.language || interaction.locale || 'en';
 
         try {
             // Smart Defer: If not already handled, defer now to protect against config fetch timeouts.

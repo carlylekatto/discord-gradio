@@ -118,8 +118,10 @@ export class ConfigParser {
             };
         }).filter(Boolean);
 
+        const mainLang = language.split('-')[0];
         const translations = config.i18n_translations ? (
             config.i18n_translations[language] || 
+            config.i18n_translations[mainLang] || 
             config.i18n_translations.en || 
             config.i18n_translations[Object.keys(config.i18n_translations)[0]]
         ) : {};

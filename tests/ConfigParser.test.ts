@@ -53,4 +53,35 @@ describe('ConfigParser', () => {
             expect(ConfigParser.findMainEndpoint(deps)).toEqual(deps[0]);
         });
     });
+
+    describe('parse', () => {
+        const dummyConfig = {
+            dependencies: [
+                { id: 0, inputs: [1], outputs: [2] }
+            ],
+            components: [
+                { id: 1, type: 'textbox', props: { label: 'Input' } },
+                { id: 2, type: 'textbox', props: { label: 'Output' } }
+            ],
+            i18n_translations: {
+                en: { Input: 'Input EN' },
+                vi: { Input: 'Input VI' }
+            }
+        };
+
+        it('should resolve full language code translation if available', () => {
+            const parsed = ConfigParser.parse(dummyConfig, null, 'en');
+            expect(parsed.translations).toEqual({ Input: 'Input EN' });
+        });
+
+        it('should fall back to language prefix if full code is not found', () => {
+            const parsed = ConfigParser.parse(dummyConfig, null, 'vi-VN');
+            expect(parsed.translations).toEqual({ Input: 'Input VI' });
+        });
+
+        it('should fall back to default "en" translation if specified language is not found', () => {
+            const parsed = ConfigParser.parse(dummyConfig, null, 'fr-FR');
+            expect(parsed.translations).toEqual({ Input: 'Input EN' });
+        });
+    });
 });

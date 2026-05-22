@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { GradioPlayground } from '../src/core/GradioPlayground';
+import { ConfigParser } from '../src/utils/ConfigParser';
 
 describe('GradioPlayground', () => {
     it('should initialize with custom options', () => {
@@ -66,6 +67,41 @@ describe('GradioPlayground', () => {
         expect(merged.loading).toBe(globalLoader);
         expect(merged.result).toBe(sessionResult);
 
+        playground.destroy();
+    });
+
+    it('should fall back to interaction.locale if options.language is not specified', async () => {
+        const playground = new GradioPlayground();
+        const mockInteraction = {
+            id: 'test_interaction',
+            locale: 'vi-VN',
+            deferred: true,
+            replied: false,
+            editReply: vi.fn().mockResolvedValue({}),
+            reply: vi.fn().mockResolvedValue({})
+        };
+
+        const fetchConfigSpy = vi.spyOn(ConfigParser, 'fetchConfig').mockResolvedValue({
+            dependencies: [{ id: 0, inputs: [], outputs: [] }],
+            components: [],
+            api_prefix: '/gradio_api'
+        });
+        const parseSpy = vi.spyOn(ConfigParser, 'parse').mockImplementation(() => {
+            return {
+                apiName: 'predict',
+                fnIndex: 0,
+                inputs: [],
+                outputs: [],
+                translations: {}
+            };
+        });
+
+        await playground.init(mockInteraction as any, 'user/app');
+
+        expect(parseSpy).toHaveBeenCalledWith(expect.anything(), null, 'vi-VN');
+
+        fetchConfigSpy.mockRestore();
+        parseSpy.mockRestore();
         playground.destroy();
     });
 });
