@@ -42,10 +42,10 @@ const COMMANDS = [
         .addSubcommand(subcommand =>
             subcommand
                 .setName('run')
-                .setDescription('Start an interaction with a Gradio Space')
+                .setDescription('Start an interaction with a Gradio App')
                 .addStringOption(option =>
-                    option.setName('space')
-                        .setDescription('Space ID or URL')
+                    option.setName('app')
+                        .setDescription('App ID or URL')
                         .setRequired(true)
                 )
                 .addStringOption(option =>
@@ -57,10 +57,10 @@ const COMMANDS = [
         .addSubcommand(subcommand =>
             subcommand
                 .setName('info')
-                .setDescription('Analyze a Gradio Space endpoints')
+                .setDescription('Analyze a Gradio App endpoints')
                 .addStringOption(option =>
-                    option.setName('space')
-                        .setDescription('Space ID or URL')
+                    option.setName('app')
+                        .setDescription('App ID or URL')
                         .setRequired(true)
                 )
         ),
@@ -97,23 +97,23 @@ client.on('interactionCreate', async interaction => {
 
         if (commandName === 'gradio') {
             const subcommand = options.getSubcommand();
-            const space = options.getString('space');
+            const app = options.getString('app');
             
             if (subcommand === 'run') {
                 const api = options.getString('api');
                 try {
-                    await playground.init(interaction, space, api);
+                    await playground.init(interaction, app, api);
                 } catch (error) {
                     console.error('Init error:', error);
                 }
             } else if (subcommand === 'info') {
                 await interaction.deferReply({ flags: 64 });
                 try {
-                    const baseUrl = ConfigParser.normalizeUrl(space);
+                    const baseUrl = ConfigParser.normalizeUrl(app);
                     const config = await ConfigParser.fetchConfig(baseUrl);
                     const parsed = ConfigParser.parse(config, null);
                     
-                    let info = `**Space Metadata:** \`${space}\`\n`;
+                    let info = `**App Metadata:** \`${app}\`\n`;
                     info += `🔹 **Main API:** \`${parsed.apiName || 'default'}\`\n`;
                     info += `📥 **Inputs:** ${parsed.inputs.length}\n`;
                     info += `📤 **Outputs:** ${parsed.outputs.length}\n`;

@@ -89,7 +89,7 @@ export class GradioPlayground {
     /**
      * Handles the /gradio run command flow
      * @param {Object} interaction - The Discord CommandInteraction
-     * @param {string} appReference - App reference (Space ID, URL, or shared link)
+     * @param {string} appReference - App reference (App ID, URL, or shared link)
      * @param {string} [targetApiName] - Optional API endpoint name. If missing, auto-detects main endpoint.
      * @param {Object} [options={}] - Additional options
      * @param {boolean} [options.ephemeral=true] - Whether initial replies should be ephemeral

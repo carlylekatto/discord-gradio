@@ -3,7 +3,7 @@ import { GradioComponent, ParsedConfig } from '../types';
 
 export class ConfigParser {
     /**
-     * Normalizes an app reference (Space ID, URL, or shared link) to a base URL
+     * Normalizes an app reference (App ID, URL, or shared link) to a base URL
      */
     static normalizeUrl(input: string): string {
         if (!input) return '';
@@ -14,18 +14,18 @@ export class ConfigParser {
             return url.replace(/\/$/, '');
         }
         
-        // 2. Handle shared links and direct space links
+        // 2. Handle shared links and direct app links
         if (url.endsWith('.gradio.live') || url.endsWith('.hf.space')) {
             return `https://${url}`;
         }
         
-        // 3. Handle Hugging Face Space IDs (user/space-name)
+        // 3. Handle Hugging Face App IDs (user/app-name)
         if (url.includes('/') && !url.startsWith('http://') && !url.startsWith('https://')) {
             const parts = url.split('/');
             if (parts.length === 2) {
-                const [user, space] = parts;
+                const [user, appName] = parts;
                 // Convert to the direct .hf.space subdomain which is more reliable for API
-                return `https://${user.toLowerCase()}-${space.toLowerCase().replace(/_/g, '-').replace(/\./g, '-')}.hf.space`;
+                return `https://${user.toLowerCase()}-${appName.toLowerCase().replace(/_/g, '-').replace(/\./g, '-')}.hf.space`;
             }
         }
 

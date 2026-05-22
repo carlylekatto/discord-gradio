@@ -17,12 +17,12 @@ describe('ConfigParser', () => {
             expect(ConfigParser.normalizeUrl('my-app.hf.space')).toBe('https://my-app.hf.space');
         });
 
-        it('should resolve Hugging Face Space IDs correctly', () => {
+        it('should resolve Hugging Face App IDs correctly', () => {
             expect(ConfigParser.normalizeUrl('black-forest-labs/FLUX.1-schnell')).toBe(
                 'https://black-forest-labs-flux-1-schnell.hf.space'
             );
-            expect(ConfigParser.normalizeUrl('user/some_space_name')).toBe(
-                'https://user-some-space-name.hf.space'
+            expect(ConfigParser.normalizeUrl('user/some_app_name')).toBe(
+                'https://user-some-app-name.hf.space'
             );
         });
 

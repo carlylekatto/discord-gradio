@@ -3,9 +3,30 @@
 [![npm version](https://img.shields.io/npm/v/discord-gradio.svg)](https://www.npmjs.com/package/discord-gradio)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Chuyển đổi bất kỳ **Gradio App** nào (Hugging Face Spaces, Link chia sẻ, hoặc Tên miền riêng) thành một **Giao diện Discord** hoàn chỉnh mà không cần cấu hình phức tạp. Được tối ưu hóa cho các tiêu chuẩn Discord hiện đại và hiệu suất cao.
+Chuyển đổi bất kỳ **Gradio App** nào (Hugging Face, Link chia sẻ, hoặc Tên miền riêng) thành một **Giao diện Discord** hoàn chỉnh mà không cần cấu hình phức tạp. Được tối ưu hóa cho các tiêu chuẩn Discord hiện đại và hiệu suất cao.
 
 [English](../README.md)
+
+## 📖 Mục lục
+- [🌟 Tại sao nên dùng Discord-Gradio?](#-tại-sao-nên-dùng-discord-gradio)
+- [📦 Cài đặt](#-cài-đặt)
+- [🛠 Bắt đầu nhanh (Discord.js v14)](#-bắt-đầu-nhanh-discordjs-v14)
+- [🧩 Các thành phần hỗ trợ & Giới hạn](#-các-thành-phần-hỗ-trợ--giới-hạn)
+- [🎨 Tùy chỉnh nâng cao](#-tùy-chỉnh-nâng-cao)
+  - [Đối tượng `customizers`](#đối-tượng-customizers)
+  - [Cập nhật tiến độ hàng đợi SSE thời gian thực](#cập-nhật-tiến-độ-hàng-đợi-sse-thời-gian-thực)
+  - [Các khóa tùy chỉnh có sẵn](#các-khóa-tùy-chỉnh-có-sẵn)
+- [⚙️ Cấu hình phiên làm việc](#-cấu-hình-phiên-làm-việc)
+  - [Tùy chọn phiên làm việc](#tùy-chọn-phiên-làm-việc)
+  - [Hệ thống Logging](#-hệ-thống-logging)
+  - [Vòng đời phiên & Quản lý bộ nhớ](#-vòng-đời-phiên--quản-lý-bộ-nhớ)
+  - [Nhập số thông minh](#-nhập-số-thông-minh)
+- [🌉 Xử lý App tải chậm (Cơ chế Bridge Button)](#-xử-lý-app-tải-chậm-cơ-chế-bridge-button)
+- [⚠️ Hạn chế & Cảnh báo trạng thái động (Dynamic State)](#️-hạn-chế--cảnh-báo-trạng-thái-động-dynamic-state)
+- [❓ Câu hỏi thường gặp (FAQ)](#-câu-hỏi-thường-gặp-faq)
+- [🧪 Kiểm thử (Testing)](#-kiểm-thử-testing)
+- [🛠️ Phát triển & Đóng góp (Contributing)](#️-phát-triển--đóng-góp-contributing)
+- [📜 Bản quyền](#-bản-quyền)
 
 ---
 
@@ -41,7 +62,7 @@ const playground = new GradioPlayground();
 client.on('interactionCreate', async (interaction) => {
     // 1. Khởi tạo phiên qua Slash Command
     if (interaction.isChatInputCommand() && interaction.commandName === 'run') {
-        const appRef = interaction.options.getString('url'); // VD: 'black-forest-labs/FLUX.1-schnell'
+        const appRef = interaction.options.getString('app'); // VD: 'black-forest-labs/FLUX.1-schnell'
         await playground.init(interaction, appRef);
         return;
     }
@@ -56,19 +77,20 @@ client.login('YOUR_TOKEN');
 
 ---
 
-## 🧩 Các thành phần hỗ trợ
+## 🧩 Các thành phần hỗ trợ & Giới hạn
 
-Thư viện tự động ánh xạ các thành phần Gradio sang giao diện Discord tương ứng tốt nhất:
+Thư viện tự động ánh xạ các thành phần Gradio sang giao diện Discord tương ứng tốt nhất. Do giới hạn của Discord API, các lựa chọn cho đầu vào sẽ được cắt bớt để ngăn ngừa lỗi API (`BASE_TYPE_BAD_LENGTH`):
 
-| Thành phần Gradio | Giao diện Discord | Ghi chú |
-|-------------------|-------------------|---------|
-| `Textbox` | `TextInput` | Hỗ trợ cả kiểu ngắn và đoạn văn. |
-| `Slider` | `TextInput` | Tự động kiểm tra phạm vi số (Min/Max). |
-| `Number` | `TextInput` | Tự động chuyển đổi sang số thực/nguyên. |
-| `Dropdown` | `StringSelect` | Sử dụng container Modal Type 18. |
-| `Radio` | `RadioGroup` | Chọn một mục từ danh sách. |
-| `Checkbox` | `Checkbox` | Checkbox gốc của Discord (Chuẩn 2026). |
-| `Image/File` | `FileUpload` | Tự động lấy URL từ tệp đính kèm Discord. |
+| Thành phần Gradio | Giao diện Discord | Giới hạn / Hành vi | Ghi chú |
+|-------------------|-------------------|--------------------|---------|
+| `Textbox` | `TextInput` | Tối đa 4000 ký tự | Hỗ trợ cả kiểu ngắn và đoạn văn. |
+| `Slider` | `TextInput` | - | Tự động kiểm tra phạm vi số (Min/Max). |
+| `Number` | `TextInput` | - | Tự động chuyển đổi sang số thực/nguyên. |
+| `Dropdown` | `StringSelect` | **Tối đa 25 lựa chọn** | Lựa chọn thừa sẽ bị cắt bớt; ghi log cảnh báo bằng `Logger.warn`. |
+| `Radio` | `RadioGroup` | **Tối đa 10 lựa chọn** | Lựa chọn thừa sẽ bị cắt bớt; ghi log cảnh báo bằng `Logger.warn`. |
+| `CheckboxGroup` | `CheckboxGroup` | **Tối đa 10 lựa chọn** | Lựa chọn thừa sẽ bị cắt bớt; ghi log cảnh báo bằng `Logger.warn`. |
+| `Checkbox` | `Checkbox` | - | Checkbox gốc của Discord (Chuẩn 2026). |
+| `Image/File` | `FileUpload` | - | Tự động lấy URL từ tệp đính kèm Discord. |
 
 ---
 
@@ -113,10 +135,43 @@ const playground = new GradioPlayground({
 });
 ```
 
+### Cập nhật tiến độ hàng đợi SSE thời gian thực
+
+Thư viện giao tiếp với hệ thống hàng đợi của Gradio bằng Server-Sent Events (SSE). Bạn có thể bắt vị trí hàng đợi và thời gian chờ ước tính theo thời gian thực bằng customizer hook `loading`:
+
+```javascript
+const playground = new GradioPlayground({
+    customizers: {
+        loading: ({ session, queue }) => {
+            if (queue) {
+                const { position, size, estimatedTime } = queue;
+                const posText = position === 0 ? 'Đang xử lý...' : `Vị trí hàng chờ: ${position}/${size || '?'}`;
+                const etaText = estimatedTime ? ` (Ước tính: ${Math.round(estimatedTime)}s)` : '';
+                return {
+                    content: `⏳ **${session.appReference}** đang chạy. ${posText}${etaText}`
+                };
+            }
+            return { content: "🚀 Đang kết nối với hàng chờ..." };
+        }
+    }
+});
+```
+
+Tham số `queue` có kiểu dữ liệu là đối tượng `QueueStatus`:
+```typescript
+interface QueueStatus {
+    position: number;       // Thứ hạng hiện tại trong hàng đợi (0 = đang chạy)
+    size?: number;          // Tổng số phiên trong hàng đợi
+    estimatedTime?: number; // Thời gian chờ dự kiến tính bằng giây
+}
+```
+
 ### Các khóa tùy chỉnh có sẵn
 - `result`: Gọi khi dự đoán thành công.
 - `error`: Gọi khi có lỗi (Kết nối, Xác thực hoặc Dự đoán).
-- `loading`: Hiển thị trong khi đợi hàng đợi của Gradio.
+- `loading`: Hiển thị trong khi đợi hàng đợi của Gradio (hỗ trợ cập nhật trạng thái `queue` thời gian thực).
+- `processingFile`: Gọi khi tải và đẩy tệp đính kèm của Discord lên Gradio.
+- `beforeInference`: Gọi ngay trước khi Gradio bắt đầu suy luận (sau khi tất cả các tệp tải lên hoàn tất).
 - `formatModal`: Chỉnh sửa dữ liệu Modal thô trước khi gửi cho Discord.
 - `inputDescription`: Thêm gợi ý/mô tả cho từng trường nhập liệu.
 
@@ -190,9 +245,9 @@ const playground = new GradioPlayground({
 
 ---
 
-## 🌉 Xử lý Space tải chậm (Cơ chế Bridge Button)
+## 🌉 Xử lý App tải chậm (Cơ chế Bridge Button)
 
-Discord Modal bắt buộc phải được hiển thị trong vòng **3 giây** kể từ khi có tương tác. Nếu một Gradio Space mất nhiều thời gian hơn để tải cấu hình, tương tác sẽ hết hạn.
+Discord Modal bắt buộc phải được hiển thị trong vòng **3 giây** kể từ khi có tương tác. Nếu một Gradio App mất nhiều thời gian hơn để tải cấu hình, tương tác sẽ hết hạn.
 
 Để giải quyết vấn đề này, **Discord-Gradio** triển khai cơ chế **Bridge Button (Nút bấm cầu nối)**:
 
@@ -236,8 +291,35 @@ const { Logger } = require('discord-gradio');
 ```
 
 **Các lỗi thường gặp:**
-- **Unknown Interaction (10062)**: Xảy ra nếu việc kết nối Gradio mất hơn 3 giây trước khi bạn `deferReply`. Thư viện sử dụng các lệnh gọi API thô để giảm thiểu việc này, nhưng các Space quá chậm vẫn có thể gặp lỗi.
-- **Inference Failed**: Đảm bảo Space không ở chế độ riêng tư và không yêu cầu đăng nhập.
+- **Unknown Interaction (10062)**: Xảy ra nếu việc kết nối Gradio mất hơn 3 giây trước khi bạn `deferReply`. Thư viện sử dụng các lệnh gọi API thô để giảm thiểu việc này, nhưng các App quá chậm vẫn có thể gặp lỗi.
+- **Inference Failed**: Đảm bảo App không ở chế độ riêng tư và không yêu cầu đăng nhập.
+
+---
+
+## ⚠️ Hạn chế & Cảnh báo trạng thái động (Dynamic State)
+
+> [!WARNING]
+> **Không hỗ trợ Giao diện động & Logic có điều kiện phức tạp**
+> Các ứng dụng Gradio phụ thuộc nhiều vào việc thay đổi giao diện động (ví dụ: ẩn/hiện trường nhập liệu, thay đổi danh sách tùy chọn dựa trên `gr.State` hoặc chạy callback thay đổi giá trị input trước khi submit chính thức) **sẽ không hoạt động chính xác**.
+>
+> **Lý do?**
+> `discord-gradio` ánh xạ giao diện Gradio một cách tĩnh dựa trên cấu hình lấy về lúc đầu. Do Discord Modal không hỗ trợ đồng bộ hóa trạng thái theo thời gian thực hoặc gọi callback sự kiện khi đang gõ văn bản, mọi cập nhật giao diện động từ Gradio không thể phản ánh lên Modal Discord. Chỉ các bố cục form tiêu chuẩn với tập hợp các trường input tĩnh là được hỗ trợ đầy đủ.
+
+---
+
+## ❓ Câu hỏi thường gặp (FAQ)
+
+#### Q: Bot của tôi bị lỗi hoặc ghi log "BASE_TYPE_BAD_LENGTH" khi dùng dropdown.
+**A:** Discord giới hạn dropdown (StringSelect) chỉ có tối đa **25** lựa chọn, Radio Group và Checkbox Group tối đa **10** lựa chọn. `discord-gradio` tự động cắt bớt các lựa chọn thừa và đưa ra cảnh báo qua `Logger.warn` để tránh lỗi Discord API (`BASE_TYPE_BAD_LENGTH`).
+
+#### Q: Bot xử lý việc tải lên tệp (hình ảnh, âm thanh, video) thế nào?
+**A:** Discord-Gradio tự động ánh xạ các loại dữ liệu đầu vào `Image`, `Audio`, `Video` và `File` sang thành phần FileUpload trên Discord. Khi modal được gửi lên, thư viện tải tệp xuống từ CDN của Discord, sau đó tải tệp đó lên endpoint `/upload` của Gradio App và thay thế đường dẫn tệp trong payload gửi lên Gradio.
+
+#### Q: Tôi có thể sử dụng các Hugging Face App ở chế độ riêng tư (Private) không?
+**A:** Hiện tại, thư viện chưa hỗ trợ các App riêng tư yêu cầu xác thực hoặc đăng nhập (OAuth/Bearer Token). Thư viện chỉ hoạt động tốt với các public Gradio App hoặc các App không yêu cầu thông tin đăng nhập.
+
+#### Q: Làm sao để xử lý việc các Gradio App phản hồi quá chậm gây hết hạn tương tác (timeout)?
+**A:** Discord yêu cầu tương tác phải được phản hồi trong vòng 3 giây. Đối với các App phản hồi chậm, hãy luôn sử dụng `interaction.deferReply()` và kích hoạt quy trình **Bridge Button**. Bạn cũng có thể tùy biến tin nhắn cầu nối qua tùy chọn `manualBridge`.
 
 ---
 
