@@ -15,15 +15,21 @@ const client = new Client({
 const playground = new GradioPlayground({
     logLevel: LogLevel.DEBUG,
     customizers: {
+        processingFile: ({ fileCount, completedCount, currentFile }) => ({
+            content: `📤 **Upload Progress:** [${completedCount}/${fileCount}] Uploading ${currentFile}...`
+        }),
+        beforeInference: () => ({
+            content: `⏳ **All files uploaded!** Launching model...`
+        }),
         loading: ({ session }) => {
-            return { 
-                content: `🚀 Connecting to **${session.appReference}**...` 
+            return {
+                content: `🚀 Connecting to **${session.appReference}**...`
             };
         },
         error: ({ error }) => {
-            return { 
-                content: `❌ **Gradio Error:** ${error.message}`, 
-                flags: 64 // Using flags instead of ephemeral
+            return {
+                content: `❌ **Gradio Error:** ${error.message}`,
+                flags: 64
             };
         }
     }

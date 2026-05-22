@@ -11,10 +11,11 @@ import {
 import { ConfigParser } from '../utils/ConfigParser';
 import { ComponentMapper } from '../mappings/ComponentMapper';
 import { IdManager } from '../utils/IdManager';
+import { I18n } from '../utils/I18n';
 import { EmbedFactory } from '../factories/EmbedFactory';
 import { Logger } from '../utils/Logger';
 import { GradioPlaygroundError, ErrorCodes } from '../errors/GradioPlaygroundError';
-import { GradioSession, Customizers, GradioComponent } from '../types';
+import { GradioSession, Customizers, GradioComponent, QueueStatus } from '../types';
 
 export class GradioPlayground {
     private sessions: Map<string, GradioSession>;
@@ -301,20 +302,19 @@ export class GradioPlayground {
             
             if (value !== undefined) {
                 try {
-                    const transformed = await this.validateAndTransform(session.inputs[i], value, session);
-                    session.values[index] = transformed;
+                    session.values[index] = await this.validateInput(session.inputs[i], value);
                 } catch (error: any) {
                     const mergedCustomizers = this.getMergedCustomizers(session);
                     let errorReply;
                     if (typeof mergedCustomizers.error === 'function') {
                         errorReply = mergedCustomizers.error({ error, session, interaction });
                     } else {
-                        errorReply = { 
-                            content: `⚠️ **Validation Error:** ${error.message}`, 
-                            flags: session.ephemeral ? 64 : undefined 
+                        errorReply = {
+                            content: `⚠️ **Validation Error:** ${error.message}`,
+                            flags: session.ephemeral ? 64 : undefined
                         };
                     }
-                    
+
                     if (interaction.deferred || interaction.replied) {
                         await interaction.editReply(errorReply);
                     } else {
@@ -344,18 +344,18 @@ export class GradioPlayground {
                 // Default Summary Embed
                 const pageSize = 5; // DISCORD_MODAL_PAGE_SIZE
                 const currentPageInputs = session.inputs.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
-                
+
                 const summaryFields = currentPageInputs.map(input => {
                     let val = session.values[input.index];
                     let displayVal = val;
-                    
+
                     if (val === null || val === undefined || val === '') displayVal = '*Empty*';
                     else if (typeof val === 'object' && val.path) displayVal = `📁 ${val.orig_name || val.path.split('/').pop()}`;
                     else if (typeof val === 'boolean') displayVal = val ? '✅ Yes' : '❌ No';
                     else displayVal = val.toString();
 
                     return {
-                        name: input.label || input.type,
+                        name: I18n.formatText(input.label || input.type, session.translations),
                         value: displayVal.length > 100 ? displayVal.substring(0, 97) + '...' : displayVal,
                         inline: true
                     };
@@ -393,6 +393,17 @@ export class GradioPlayground {
         } else {
             // Final page
             const mergedCustomizers = this.getMergedCustomizers(session);
+
+            // 1. Process files
+            await this.processFileUploads(session, interaction, session.inputs);
+
+            // 2. Before Inference
+            if (typeof mergedCustomizers.beforeInference === 'function') {
+                const reply = mergedCustomizers.beforeInference({ session, interaction });
+                if (reply) await interaction.editReply(reply);
+            }
+
+            // 3. Loading (Inference)
             let loadingReply;
             if (typeof mergedCustomizers.loading === 'function') {
                 loadingReply = mergedCustomizers.loading({ session, interaction });
@@ -407,7 +418,27 @@ export class GradioPlayground {
             }
 
             try {
-                const result = await this.execute(sessionId);
+                const result = await this.execute(sessionId, async (queueStatus) => {
+                    let updatedLoadingReply;
+                    if (typeof mergedCustomizers.loading === 'function') {
+                        updatedLoadingReply = mergedCustomizers.loading({
+                            session,
+                            interaction,
+                            queue: queueStatus
+                        });
+                    } else {
+                        updatedLoadingReply = {
+                            embeds: [this.embedFactory.createLoadingEmbed(session.appReference, queueStatus)]
+                        };
+                    }
+                    if (updatedLoadingReply) {
+                        try {
+                            await interaction.editReply(updatedLoadingReply);
+                        } catch (e) {
+                            Logger.warn('Failed to update queue status on Discord:', e);
+                        }
+                    }
+                });
                 let replyData;
 
                 if (typeof mergedCustomizers.result === 'function') {
@@ -543,7 +574,10 @@ export class GradioPlayground {
     /**
      * Execute Gradio API call using SSE Queue (Proven logic from katto-messenger)
      */
-    private async execute(sessionId: string): Promise<any> {
+    private async execute(
+        sessionId: string,
+        onQueueUpdate?: (status: QueueStatus) => void
+    ): Promise<any> {
         const session = this.getSession(sessionId);
         if (!session) throw new GradioPlaygroundError(ErrorCodes.SESSION_NOT_FOUND, 'Session not found.');
 
@@ -612,7 +646,22 @@ export class GradioPlayground {
                                 try {
                                     const msg = JSON.parse(jsonStr);
                                     
-                                    if (msg.msg === 'process_completed') {
+                                    if (msg.msg === 'estimation') {
+                                        if (onQueueUpdate) {
+                                            onQueueUpdate({
+                                                position: msg.rank,
+                                                size: msg.queue_size,
+                                                estimatedTime: msg.rank_eta
+                                            });
+                                        }
+                                    } else if (msg.msg === 'process_starts') {
+                                        if (onQueueUpdate) {
+                                            onQueueUpdate({
+                                                position: 0,
+                                                estimatedTime: msg.eta
+                                            });
+                                        }
+                                    } else if (msg.msg === 'process_completed') {
                                         if (!msg.success) {
                                             return reject(new Error('Process failed: ' + JSON.stringify(msg.output)));
                                         }
@@ -665,7 +714,11 @@ export class GradioPlayground {
         }
     }
 
-    private async validateAndTransform(component: GradioComponent, value: string, session: GradioSession): Promise<any> {
+    private async validateInput(component: GradioComponent, value: any): Promise<any> {
+        if ((component.type === 'dropdown' || component.type === 'radio') && Array.isArray(value)) {
+            value = value[0] ?? null;
+        }
+
         if (!value && component.type !== 'checkbox') return component.value;
 
         switch (component.type) {
@@ -673,7 +726,7 @@ export class GradioPlayground {
             case 'slider':
                 const num = typeof value === 'string' ? parseFloat(value) : value;
                 if (typeof num !== 'number' || isNaN(num)) return num;
-                
+
                 if (component.props?.minimum !== undefined && num < component.props.minimum) {
                     Logger.warn(`Value ${num} is less than minimum ${component.props.minimum} for ${component.label}`);
                 }
@@ -687,24 +740,40 @@ export class GradioPlayground {
                 if (typeof value === 'string') return value.toLowerCase() === 'y' || value.toLowerCase() === 'yes' || value.toLowerCase() === 'true';
                 return !!value;
 
-            case 'image':
-            case 'file':
-            case 'audio':
-            case 'video':
-                // Auto-upload if it's a URL string
-                if (typeof value === 'string' && value.startsWith('http')) {
-                    const buffer = await this.download(value);
-                    // Extract clean filename (strip query params)
-                    let filename = value.split('/').pop() || 'file.tmp';
-                    if (filename.includes('?')) {
-                        filename = filename.split('?')[0];
-                    }
-                    return await this.upload(session.appReference, buffer, filename);
-                }
-                return value;
-
             default:
                 return value;
+        }
+    }
+
+    private async processFileUploads(session: GradioSession, interaction: any, inputs: any[]): Promise<void> {
+        const fileComponents = inputs.filter(i => ['image', 'file', 'audio', 'video'].includes(i.type));
+        if (fileComponents.length === 0) return;
+
+        const mergedCustomizers = this.getMergedCustomizers(session);
+        let completedCount = 0;
+
+        for (const input of fileComponents) {
+            const value = session.values[input.index];
+            if (typeof value === 'string' && value.startsWith('http')) {
+                // Update UI: Processing
+                if (typeof mergedCustomizers.processingFile === 'function') {
+                    const reply = mergedCustomizers.processingFile({
+                        session,
+                        interaction,
+                        fileCount: fileComponents.length,
+                        completedCount,
+                        currentFile: value.split('/').pop()
+                    });
+                    if (reply) await interaction.editReply(reply);
+                }
+
+                const buffer = await this.download(value);
+                let filename = value.split('/').pop() || 'file.tmp';
+                if (filename.includes('?')) filename = filename.split('?')[0];
+
+                session.values[input.index] = await this.upload(session.appReference, buffer, filename);
+                completedCount++;
+            }
         }
     }
 

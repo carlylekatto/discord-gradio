@@ -14,3 +14,4 @@ examples/*.log
 *.tsbuildinfo
 
 package-lock.json
+.claude

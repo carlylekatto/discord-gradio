@@ -38,6 +38,12 @@ export interface GradioSession {
     lastAccessedAt?: number;
 }
 
+export interface QueueStatus {
+    position: number;
+    size?: number;
+    estimatedTime?: number;
+}
+
 export interface CustomizerPayload {
     session?: GradioSession;
     interaction?: any;
@@ -49,15 +55,22 @@ export interface CustomizerPayload {
     props?: GradioComponentProps;
     type?: string;
     defaultDescription?: string;
+    // Processing status
+    fileCount?: number;
+    completedCount?: number;
+    currentFile?: string;
+    // Queue status
+    queue?: QueueStatus;
 }
 
 export interface Customizers {
+    processingFile?: (payload: CustomizerPayload) => any;
+    beforeInference?: (payload: CustomizerPayload) => any;
     loading?: (payload: CustomizerPayload) => any;
     result?: (payload: CustomizerPayload) => any;
     error?: (payload: CustomizerPayload) => any;
     pageConfirmation?: (payload: CustomizerPayload) => any;
     inputDescription?: (payload: CustomizerPayload) => string | undefined;
-    markdown?: (payload: CustomizerPayload) => any;
     formatModal?: (modalData: any, session: GradioSession, pageIndex: number) => any;
 }
 
