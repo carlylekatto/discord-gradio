@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="./docs/discord-gradio.png" alt="Discord Gradio" width="400" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/discord-gradio-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/discord-gradio.png">
+    <img alt="Discord Gradio" src="./docs/discord-gradio.png" width="400">
+  </picture>
 </p>
 
 <h1 align="center">🤖 Discord Gradio Integration</h1>

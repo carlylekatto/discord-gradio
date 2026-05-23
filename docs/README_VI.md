@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="./discord-gradio.png" alt="Discord Gradio" width="400" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./discord-gradio-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./discord-gradio.png">
+    <img alt="Discord Gradio" src="./discord-gradio.png" width="400">
+  </picture>
 </p>
 
 <h1 align="center">🤖 Tích hợp Discord với Gradio</h1>
